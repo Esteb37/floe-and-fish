@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font:14px/1.4 system-ui,sans-serif}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<title>Floe &amp; Fish</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bagel+Fat+One&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one-screen arcade. HUD strip, framed polar-night stage, finger-hint line, full US QWERTY board.
+   Deliberately single-theme: the game is set at night on the sea, so it looks the same in light and dark hosts. */
+:root{
+  --night:#0b1430; --deep:#13254a; --panel:#172c55; --line:#2a4778;
+  --ice:#eef7fc; --frost:#a9c4dc; --coral:#ff8f66; --coral-dark:#d9623d; --coral-light:#ffc2a3;
+  --gold:#ffd166; --bad:#ff5d73; --teal-ink:#127f73; --mouth:#41202c;
+  --sky-top:#070e24; --sky-low:#1d3a63; --sea-top:#15486a; --sea-deep:#071a2e;
+  --seal:#8d9db0; --seal-dark:#66778c; --seal-belly:#cdd8e2;
+  --aur-a:#4fe0c0; --aur-b:#9d7bff;
+  --scrim:rgba(8,15,38,.78);
+  --f-lp:#e8798f; --f-lr:#eba45c; --f-lm:#dccf5a; --f-li:#7fcb7a;
+  --f-ri:#56c6c4; --f-rm:#6fa3ec; --f-rr:#a98ce8; --f-rp:#de8bd8; --f-th:#aeb9cf;
+  --display:"Bagel Fat One","Arial Rounded MT Bold","Trebuchet MS",sans-serif;
+  --body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--night);color:var(--ice);font-family:var(--body);overflow-x:hidden}
+*{box-sizing:border-box}
+#app{height:100%;min-height:540px;max-width:1180px;margin:0 auto;display:grid;
+  grid-template-rows:auto minmax(220px,1fr) auto auto;gap:10px;padding-block:12px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* HUD */
+.hud{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px}
+.brand{font-family:var(--display);font-size:1.55rem;line-height:1;color:var(--ice);font-weight:400}
+.brand span,.title .amp{color:var(--coral)}
+.stats{display:flex;flex-wrap:wrap;gap:6px 20px;flex:1;min-width:0}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat .k{font-size:.66rem;text-transform:uppercase;letter-spacing:.14em;color:var(--frost)}
+.stat .v{font-family:var(--mono);font-weight:600;font-size:1.02rem;font-variant-numeric:tabular-nums;min-height:1.3em;display:flex;align-items:center}
+.pip{display:inline-block;width:13px;height:8px;background:var(--coral);border-radius:50% 45% 45% 50%;position:relative;margin-right:9px}
+.pip::after{content:"";position:absolute;right:-5px;top:1px;border-left:6px solid var(--coral);border-top:3px solid transparent;border-bottom:3px solid transparent}
+.pip.lost{opacity:.2}
+.ctrls{display:flex;gap:8px}
+button{font:inherit;color:inherit;cursor:pointer}
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 13px;font-weight:700;font-size:.85rem;color:var(--ice)}
+.btn:hover:not(:disabled){border-color:var(--frost)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.primary{background:var(--coral);color:var(--night);border-color:var(--coral)}
+.btn.primary:hover{border-color:var(--ice)}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+
+/* Stage */
+.stage{position:relative;border-radius:18px;overflow:hidden;background:var(--deep);border:1px solid var(--line);min-height:0}
+#cv{display:block;position:absolute;inset:0}
+#mobileInput{position:absolute;left:0;bottom:0;width:1px;height:1px;opacity:0;border:0;padding:0;font-size:16px;pointer-events:none;background:transparent;color:transparent}
+.overlay{position:absolute;inset:0;z-index:2;overflow-y:auto;background:var(--scrim);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:flex;padding:clamp(16px,4vw,36px)}
+.overlay[hidden]{display:none}
+.panel{margin:auto;width:100%;max-width:760px;display:grid;gap:20px}
+.panel.small{max-width:520px}
+.eyebrow{margin:0;font-size:.72rem;text-transform:uppercase;letter-spacing:.18em;color:var(--frost);font-weight:700}
+.title{margin:4px 0 0;font-family:var(--display);font-weight:400;font-size:clamp(2.4rem,7vw,4rem);line-height:.95;letter-spacing:.005em;text-wrap:balance}
+.title2{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(1.9rem,5vw,2.6rem);line-height:1}
+.lead{margin:8px 0 0;max-width:60ch;color:var(--frost);font-size:1rem;line-height:1.5}
+.group{display:grid;gap:10px}
+.group h2{margin:0;font-size:.72rem;text-transform:uppercase;letter-spacing:.16em;color:var(--frost)}
+.lessons{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
+.lesson{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 13px;display:grid;gap:5px;transition:border-color .15s,transform .15s}
+.lesson:hover{border-color:var(--coral);transform:translateY(-1px)}
+.lesson.last{border-color:var(--gold)}
+.lesson .nm{font-weight:700;font-size:.98rem;color:var(--ice)}
+.lesson .ks{font-family:var(--mono);font-size:.78rem;color:var(--coral);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lesson .bs{font-size:.72rem;color:var(--frost);font-variant-numeric:tabular-nums}
+.opt{display:flex;gap:10px;align-items:flex-start;line-height:1.4;color:var(--frost);cursor:pointer;max-width:60ch}
+.opt input{accent-color:var(--coral);width:18px;height:18px;margin:1px 0 0;flex:none}
+.opt b{color:var(--ice)}
+.tips{margin:0;color:var(--frost);font-size:.88rem;line-height:1.5;max-width:65ch}
+.tips kbd,.hint kbd,.trouble kbd{font-family:var(--mono);font-weight:600;font-size:.85em;background:var(--panel);color:var(--ice);border:1px solid var(--line);border-bottom:3px solid var(--fc,var(--line));border-radius:6px;padding:1px 7px}
+.touch-tip{display:none;margin:0;color:var(--gold);font-size:.88rem}
+@media (pointer:coarse){.touch-tip{display:block}}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+.scoreline{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+.big{font-family:var(--display);font-size:clamp(2.6rem,9vw,3.6rem);line-height:1;color:var(--gold);font-variant-numeric:tabular-nums}
+.pill{font-size:.78rem;font-weight:700;border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--frost)}
+.pill.new{background:var(--gold);color:var(--night);border-color:var(--gold)}
+.sgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 16px;margin:0}
+.sgrid div{display:grid;gap:2px;border-top:1px solid var(--line);padding-top:8px}
+.sgrid dt{font-size:.66rem;text-transform:uppercase;letter-spacing:.14em;color:var(--frost)}
+.sgrid dd{margin:0;font-family:var(--mono);font-weight:600;font-size:1.15rem;font-variant-numeric:tabular-nums}
+@media (max-width:420px){.sgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.trouble h3{margin:0 0 8px;font-size:.72rem;text-transform:uppercase;letter-spacing:.16em;color:var(--frost)}
+.trouble #ovTrouble{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;color:var(--frost);font-size:.9rem}
+.trouble .tk{display:inline-flex;gap:6px;align-items:center}
+
+/* Hint line */
+.hint{min-height:30px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-size:.9rem;color:var(--frost)}
+.hint .lbl{font-size:.66rem;text-transform:uppercase;letter-spacing:.14em}
+.hint .fing{color:var(--ice);font-weight:700}
+.hint .plus{opacity:.6}
+.chip{display:inline-flex;gap:6px;align-items:center;font-size:.76rem;white-space:nowrap}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--fc);display:inline-block}
+
+/* Keyboard */
+.kbwrap{display:flex;justify-content:center}
+.kb{width:min(100%,780px);container-type:inline-size}
+.krow{display:grid;grid-template-columns:repeat(60,minmax(0,1fr))}
+.krow+.krow{margin-top:.6cqw}
+.key{grid-column:span var(--span);margin-inline:.3cqw;height:max(22px,5.6cqw);background:var(--panel);border-radius:.9cqw;
+  border:1px solid var(--line);border-bottom:max(2px,.45cqw) solid var(--fc);color:var(--frost);font-family:var(--mono);font-weight:600;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05;position:relative;user-select:none;min-width:0}
+.key .lo{font-size:max(9px,2cqw)}
+.key .up{font-size:max(8px,1.5cqw);opacity:.75}
+.key .mod{font-family:var(--body);font-size:max(8px,1.45cqw);font-weight:700;letter-spacing:.02em}
+.key.bump::after{content:"";position:absolute;bottom:16%;width:22%;height:2px;border-radius:2px;background:currentColor;opacity:.7}
+.key.target{background:var(--fc);color:var(--night);border-color:var(--fc);box-shadow:0 0 0 2px var(--fc),0 0 16px var(--fc);animation:pulse 1.1s ease-in-out infinite}
+.key.hit{animation:hit .28s ease-out}
+.key.bad{animation:bad .32s ease-out}
+@keyframes pulse{50%{box-shadow:0 0 0 2px var(--fc),0 0 4px var(--fc)}}
+@keyframes hit{from{background:var(--ice);color:var(--night)}}
+@keyframes bad{0%{background:var(--bad);color:var(--night);transform:translateX(-3px)}35%{transform:translateX(3px)}65%{transform:translateX(-1px)}100%{transform:none}}
+@media (prefers-reduced-motion:reduce){.key.target,.key.hit,.key.bad{animation:none}.lesson{transition:none}.lesson:hover{transform:none}}
+</style>
+
+</head>
+<body>
+<div id="app">
+  <header class="hud">
+    <div class="brand" aria-label="Floe and Fish">Floe <span>&amp;</span> Fish</div>
+    <div class="stats" aria-live="off">
+      <div class="stat"><span class="k">Score</span><span class="v" id="sScore">0</span></div>
+      <div class="stat"><span class="k">Wave</span><span class="v" id="sWave">1</span></div>
+      <div class="stat"><span class="k">Combo</span><span class="v" id="sCombo">0</span></div>
+      <div class="stat"><span class="k">Accuracy</span><span class="v" id="sAcc">–</span></div>
+      <div class="stat"><span class="k">WPM</span><span class="v" id="sWpm">–</span></div>
+      <div class="stat"><span class="k">Lives</span><span class="v" id="sLives"></span></div>
+    </div>
+    <div class="ctrls">
+      <button class="btn" id="btnSound" type="button" aria-pressed="true">Sound on</button>
+      <button class="btn" id="btnPause" type="button" disabled>Pause</button>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <canvas id="cv" aria-label="Fish fall toward the sea carrying keys to type"></canvas>
+    <input id="mobileInput" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Typing input" tabindex="-1">
+
+    <section class="overlay" id="menu" aria-labelledby="menuTitle">
+      <div class="panel">
+        <div>
+          <p class="eyebrow">US QWERTY typing practice</p>
+          <h1 class="title" id="menuTitle">Floe <span class="amp">&amp;</span> Fish</h1>
+          <p class="lead">Fish drop toward the sea, each carrying a key. Type the key and the seal on the ice floe catches the fish. Let five fish reach the water and the round ends. Each wave falls faster.</p>
+        </div>
+        <div class="group"><h2>Keys</h2><div class="lessons" id="lessonsKeys"></div></div>
+        <div class="group"><h2>Words</h2><div class="lessons" id="lessonsWords"></div></div>
+        <label class="opt" for="optCalm"><input type="checkbox" id="optCalm"><span><b>Calm water.</b> Missed fish cost no lives, so the round runs until you end it. Good for learning new keys.</span></label>
+        <p class="tips">Rest your fingers on the home row: <kbd style="--fc:var(--f-lp)">A</kbd> <kbd style="--fc:var(--f-lr)">S</kbd> <kbd style="--fc:var(--f-lm)">D</kbd> <kbd style="--fc:var(--f-li)">F</kbd> for the left hand, <kbd style="--fc:var(--f-ri)">J</kbd> <kbd style="--fc:var(--f-rm)">K</kbd> <kbd style="--fc:var(--f-rr)">L</kbd> <kbd style="--fc:var(--f-rp)">;</kbd> for the right. The glowing key on the board below is the next one to press. <kbd>Esc</kbd> pauses. In word lessons, <kbd>Backspace</kbd> lets go of a word you started.</p>
+        <p class="touch-tip">This game is built for a physical keyboard. Without one, tap the sea during a round to open the on-screen keyboard.</p>
+      </div>
+    </section>
+
+    <section class="overlay" id="pauseO" hidden aria-labelledby="pauseTitle">
+      <div class="panel small">
+        <div>
+          <h2 class="title2" id="pauseTitle">Paused</h2>
+          <p class="lead">Press Esc or Enter to keep going.</p>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="btnResume" type="button">Resume</button>
+          <button class="btn" id="btnEnd" type="button">End round</button>
+          <button class="btn" id="btnMenu1" type="button">Choose lesson</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="overlay" id="overO" hidden aria-labelledby="ovTitle">
+      <div class="panel small">
+        <div>
+          <p class="eyebrow" id="ovLesson"></p>
+          <h2 class="title2" id="ovTitle">Out of lives</h2>
+        </div>
+        <div class="scoreline"><span class="big" id="ovScore">0</span><span class="pill" id="ovBest"></span></div>
+        <dl class="sgrid" id="ovStats"></dl>
+        <div class="trouble"><h3>Keys to practice</h3><div id="ovTrouble"></div></div>
+        <div class="row">
+          <button class="btn primary" id="btnAgain" type="button">Play again</button>
+          <button class="btn" id="btnMenu2" type="button">Choose lesson</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="hint" id="hint" aria-live="polite"></div>
+  <div class="kbwrap"><div class="kb" id="kb" aria-hidden="true"></div></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const TAU = Math.PI * 2;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const coarse = matchMedia('(pointer: coarse)').matches;
+const css = getComputedStyle(document.documentElement);
+const C = n => css.getPropertyValue('--' + n).trim();
+const COL = {
+  night:C('night'), ice:C('ice'), frost:C('frost'), coral:C('coral'), coralDark:C('coral-dark'), coralLight:C('coral-light'),
+  gold:C('gold'), bad:C('bad'), tealInk:C('teal-ink'), mouth:C('mouth'), skyTop:C('sky-top'), skyLow:C('sky-low'),
+  seaTop:C('sea-top'), seaDeep:C('sea-deep'), seal:C('seal'), sealDark:C('seal-dark'), sealBelly:C('seal-belly'),
+  aurA:C('aur-a'), aurB:C('aur-b')
+};
+const FINGERS = {
+  lp:'left pinky', lr:'left ring', lm:'left middle', li:'left index',
+  ri:'right index', rm:'right middle', rr:'right ring', rp:'right pinky', th:'either thumb'
+};
+const FCOL = {}; for (const f in FINGERS) FCOL[f] = C('f-' + f);
+const SHORT = {lp:'L pinky', lr:'L ring', lm:'L middle', li:'L index', ri:'R index', rm:'R middle', rr:'R ring', rp:'R pinky', th:'Thumbs'};
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = n => n.toLocaleString('en-US');
+function hexA(hex, a){ const h = hex.replace('#',''); const n = parseInt(h, 16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+
+/* ---------- US QWERTY layout: [base, shifted, finger, width] ---------- */
+const ROWS = [
+  [['`','~','lp'],['1','!','lp'],['2','@','lr'],['3','#','lm'],['4','$','li'],['5','%','li'],['6','^','ri'],['7','&','ri'],['8','*','rm'],['9','(','rr'],['0',')','rp'],['-','_','rp'],['=','+','rp'],{id:'Backspace',label:'Backspace',w:2,f:'rp'}],
+  [{id:'Tab',label:'Tab',w:1.5,f:'lp'},['q','Q','lp'],['w','W','lr'],['e','E','lm'],['r','R','li'],['t','T','li'],['y','Y','ri'],['u','U','ri'],['i','I','rm'],['o','O','rr'],['p','P','rp'],['[','{','rp'],[']','}','rp'],['\\','|','rp',1.5]],
+  [{id:'Caps',label:'Caps',w:1.75,f:'lp'},['a','A','lp'],['s','S','lr'],['d','D','lm'],['f','F','li'],['g','G','li'],['h','H','ri'],['j','J','ri'],['k','K','rm'],['l','L','rr'],[';',':','rp'],["'",'"','rp'],{id:'Enter',label:'Enter',w:2.25,f:'rp'}],
+  [{id:'ShiftL',label:'Shift',w:2.25,f:'lp'},['z','Z','lp'],['x','X','lr'],['c','C','lm'],['v','V','li'],['b','B','li'],['n','N','ri'],['m','M','ri'],[',','<','rm'],['.','>','rr'],['/','?','rp'],{id:'ShiftR',label:'Shift',w:2.75,f:'rp'}],
+  [{spacer:3.75},{id:'Space',label:'',w:6.25,f:'th'},{spacer:5}]
+];
+const keyEls = {}, charToKey = {}, keyFinger = {};
+function buildKeyboard(){
+  const kb = $('#kb'); kb.textContent = '';
+  for (const row of ROWS){
+    const r = document.createElement('div'); r.className = 'krow';
+    for (const k of row){
+      const el = document.createElement('div');
+      if (k.spacer){ el.style.gridColumn = `span ${k.spacer*4}`; r.appendChild(el); continue; }
+      let id, w, f, html, mod = false;
+      if (Array.isArray(k)){
+        const [base, sh, fi, ww = 1] = k; id = base; w = ww; f = fi;
+        html = /[a-z]/.test(base) ? `<span class="lo">${esc(sh)}</span>` : `<span class="up">${esc(sh)}</span><span class="lo">${esc(base)}</span>`;
+        charToKey[base] = {id, shift:false}; charToKey[sh] = {id, shift:true};
+      } else { id = k.id; w = k.w; f = k.f; html = `<span class="mod">${k.label}</span>`; mod = true; }
+      el.className = 'key' + (mod ? ' modk' : '') + (id === 'f' || id === 'j' ? ' bump' : '');
+      el.style.setProperty('--span', w * 4);
+      el.style.setProperty('--fc', `var(--f-${f})`);
+      el.innerHTML = html;
+      keyEls[id] = el; keyFinger[id] = f;
+      r.appendChild(el);
+    }
+    kb.appendChild(r);
+  }
+  charToKey[' '] = {id:'Space', shift:false};
+}
+const fingerOf = ch => { const k = charToKey[ch]; return k ? keyFinger[k.id] : 'th'; };
+const shiftFor = id => keyFinger[id][0] === 'l' ? 'ShiftR' : 'ShiftL';
+
+/* ---------- Lessons ---------- */
+const LESSONS = [
+  {id:'home',   group:'Keys', name:'Home row',        chars:'asdfjkl;', preview:'a s d f  j k l ;'},
+  {id:'homegh', group:'Keys', name:'Home row + G H',  chars:'asdfghjkl;', preview:'a s d f g  h j k l ;'},
+  {id:'top',    group:'Keys', name:'Top row',         chars:'qwertyuiop', preview:'q w e r t  y u i o p'},
+  {id:'bottom', group:'Keys', name:'Bottom row',      chars:'zxcvbnm,./', preview:'z x c v b  n m , . /'},
+  {id:'alpha',  group:'Keys', name:'All letters',     chars:'abcdefghijklmnopqrstuvwxyz', preview:'a to z'},
+  {id:'nums',   group:'Keys', name:'Number row',      chars:'1234567890', preview:'1 2 3 4 5  6 7 8 9 0'},
+  {id:'caps',   group:'Keys', name:'Capitals',        chars:'ABCDEFGHIJKLMNOPQRSTUVWXYZ', preview:'A to Z with Shift'},
+  {id:'sym',    group:'Keys', name:'Symbols',         chars:"`~!@#$%^&*()-_=+[]{}\\|;:'\",.<>/?", preview:'! @ # $ % ( ) [ ] ; \' " / ?'},
+  {id:'whome',  group:'Words', name:'Home row words', words:'as ad add ads all ash dad fad gal gas had has half hall lad lag lass sad sag sash shall flash flask glad glass hash slash salsa dash flag fall falls ask asks jag salad lash gash alas saga gala halls flags lads'.split(' ')},
+  {id:'wtop',   group:'Words', name:'Top + home words', words:'that this there their other would should quiet power water tower write house shore ride sail tide fish seal float drift ripple polar frost whale shelf otter kelp squid tusk fjord great light story first people world right thought after staff deep hope lighthouse starfish weather'.split(' ')},
+  {id:'wcommon',group:'Words', name:'Common words',   words:'the be to of and in that have it for not on with he as you do at this but his by from they we say her she or an will my one all would there their what so up out if about who get which go me when make can like time no just him know take people into year your good some could them see other than then now look only come its over think also back after use two how our work first well way even new want because any these give day most us'.split(' ')},
+  {id:'wpolar', group:'Words', name:'Polar words',    words:'iceberg glacier walrus narwhal plankton current snowfall harbor blizzard tundra krill aurora flipper whiskers salmon herring mackerel seaweed icebreaker permafrost snowdrift midnight compass anchor kayak northern lantern icicle crevasse sledge husky caribou ptarmigan floe'.split(' ')}
+];
+for (const L of LESSONS) if (L.words && !L.preview) L.preview = L.words.slice(0, 4).join(' ');
+
+/* ---------- Storage (per-viewer convenience only) ---------- */
+const store = {
+  data:{best:{}, calm:false, muted:false, last:'home'},
+  load(){ try { const raw = localStorage.getItem('floe-fish:v1'); if (raw) Object.assign(this.data, JSON.parse(raw)); } catch(e){} },
+  save(){ try { localStorage.setItem('floe-fish:v1', JSON.stringify(this.data)); } catch(e){} }
+};
+
+/* ---------- Sound ---------- */
+let ac = null;
+function audio(){
+  if (!ac){ try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ ac = null; } }
+  if (ac && ac.state === 'suspended') ac.resume().catch(()=>{});
+  return ac;
+}
+function tone(freq, dur, type='sine', vol=0.12, slideTo=0){
+  if (store.data.muted || !ac) return;
+  const t0 = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(ac.destination); o.start(t0); o.stop(t0 + dur + 0.03);
+}
+const sfx = {
+  catch(combo){ const f = 520 * Math.pow(2, Math.min(combo, 24) / 24); tone(f, .12, 'triangle', .12); setTimeout(() => tone(f * 1.5, .1, 'triangle', .07), 55); },
+  key(){ tone(900, .035, 'sine', .04); },
+  error(){ tone(150, .16, 'square', .05, 100); },
+  wave(){ [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, .16, 'triangle', .09), i * 90)); },
+  splash(){
+    if (store.data.muted || !ac) return;
+    const len = Math.floor(ac.sampleRate * .32), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+    const src = ac.createBufferSource(), lp = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = buf; lp.type = 'lowpass'; lp.frequency.value = 900; g.gain.value = .22;
+    src.connect(lp).connect(g).connect(ac.destination); src.start();
+  }
+};
+
+/* ---------- Game state ---------- */
+const MAX_LIVES = 5;
+const st = {
+  mode:'menu', lesson:null, score:0, lives:MAX_LIVES, combo:0, bestCombo:0, wave:1, waveCatches:0,
+  caught:0, missed:0, typedCorrect:0, typedTotal:0, errors:0, activeTime:0, lock:null, spawnT:0,
+  trouble:{}, lastText:'', endedBy:'', target:null
+};
+let items = [], parts = [], ripples = [], popups = [], banner = null, snow = [], stars = [], bergs = [];
+let shakeT = 0, demoT = 0, time = 0, nextId = 1, overTimer = 0;
+const seal = {x:0, face:1, chomp:0, shake:0};
+
+// Wave 1 plays at the old wave-6 pace; each later wave keeps speeding up from there.
+const SPEED_HEAD_START = 5;
+function params(){
+  const sw = st.wave + SPEED_HEAD_START, w = sw - 1, words = !!st.lesson.words;
+  return words
+    ? {fall:Math.max(4.0, 11 * Math.pow(.92, w)), every:Math.max(1.0, 3.2 * Math.pow(.92, w)), max:Math.min(6, 2 + Math.ceil(sw / 3)), per:6}
+    : {fall:Math.max(2.2, 8.5 * Math.pow(.9, w)), every:Math.max(.4, 1.6 * Math.pow(.9, w)), max:Math.min(9, 3 + Math.ceil(sw / 2)), per:12};
+}
+
+/* ---------- Canvas ---------- */
+const stage = $('#stage'), cv = $('#cv'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, S = 1, waterY = 0, skyGrad = null, seaGrad = null;
+function resize(){
+  const r = stage.getBoundingClientRect();
+  W = Math.max(1, r.width); H = Math.max(1, r.height); DPR = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  S = Math.max(.72, Math.min(1.25, Math.min(W / 760, H / 440)));
+  waterY = H - Math.max(46, Math.min(92, H * .15));
+  skyGrad = ctx.createLinearGradient(0, 0, 0, waterY);
+  skyGrad.addColorStop(0, COL.skyTop); skyGrad.addColorStop(1, COL.skyLow);
+  seaGrad = ctx.createLinearGradient(0, waterY, 0, H);
+  seaGrad.addColorStop(0, COL.seaTop); seaGrad.addColorStop(1, COL.seaDeep);
+  stars = Array.from({length: Math.round(W * waterY / 9000)}, () => ({x:Math.random() * W, y:Math.random() * waterY * .75, r:Math.random() * 1.2 + .3, ph:Math.random() * TAU, sp:.6 + Math.random() * 1.6}));
+  bergs = []; let bx = -40;
+  while (bx < W + 40){ const w = (60 + Math.random() * 140) * S, h = (14 + Math.random() * 46) * S; bergs.push({x:bx, w, h, peak:.25 + Math.random() * .5}); bx += w * (.7 + Math.random() * .9); }
+  const n = reduceMotion ? 20 : 60;
+  if (snow.length !== n) snow = Array.from({length:n}, () => ({x:Math.random() * W, y:Math.random() * H, r:Math.random() * 1.6 + .5, vy:12 + Math.random() * 22, ph:Math.random() * TAU}));
+  for (const f of snow){ if (f.x > W) f.x = Math.random() * W; if (f.y > H) f.y = Math.random() * H; }
+  if (!seal.x) seal.x = W / 2;
+  seal.x = Math.max(70 * S, Math.min(W - 70 * S, seal.x));
+}
+function rr(x, y, w, h, r){
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else { ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+}
+const floeY = () => waterY + 3 * S + (reduceMotion ? 0 : Math.sin(time * 1.6) * 1.6 * S);
+const mouth = () => ({x: seal.x + seal.face * 38 * S, y: floeY() - 6 * S - 28 * S});
+const charFont = () => `600 ${Math.round(19 * S)}px "IBM Plex Mono", ui-monospace, monospace`;
+const wordFont = () => `600 ${Math.round(17 * S)}px "IBM Plex Mono", ui-monospace, monospace`;
+function labelWidth(text){
+  if (text.length === 1) return 30 * S;
+  ctx.font = wordFont(); return ctx.measureText(text).width + 22 * S;
+}
+
+/* ---------- Spawning ---------- */
+function pickText(){
+  const L = st.lesson, falling = items.filter(i => i.state === 'fall');
+  const onScreen = new Set(falling.map(i => i.text)), firsts = new Set(falling.map(i => i.text[0]));
+  const pool = L.chars ? [...L.chars] : L.words;
+  const troubleKeys = L.chars ? pool.filter(c => st.trouble[c]) : [];
+  let cand = pool[0];
+  for (let tries = 0; tries < 24; tries++){
+    cand = (troubleKeys.length && Math.random() < .25) ? troubleKeys[Math.random() * troubleKeys.length | 0] : pool[Math.random() * pool.length | 0];
+    if (cand === st.lastText && pool.length > 1) continue;
+    if (onScreen.has(cand) && tries < 20) continue;
+    if (L.words && firsts.has(cand[0]) && tries < 16) continue;
+    break;
+  }
+  st.lastText = cand; return cand;
+}
+function spawn(text, fall, demo=false){
+  const w = Math.max(70 * S, labelWidth(text)), half = w / 2 + 12;
+  const near = items.filter(i => i.state === 'fall' && i.y < H * .45);
+  let bestX = W / 2, bestD = -Infinity;
+  for (let k = 0; k < 10; k++){
+    const x = half + Math.random() * Math.max(1, W - 2 * half);
+    let d = 1e9; for (const o of near) d = Math.min(d, Math.abs(o.x - x) - (o.w / 2 + w / 2));
+    if (d > bestD){ bestD = d; bestX = x; }
+  }
+  items.push({id:nextId++, text, typed:0, x:bestX, baseX:bestX, y:-34 * S, vy:(waterY + 34 * S) / fall, w,
+    phase:Math.random() * TAU, dir:Math.random() < .5 ? -1 : 1, state:'fall', t:0, demo, sx:0, sy:0, pts:0, decided:false});
+}
+
+/* ---------- Gameplay ---------- */
+function beginCatch(it){ it.state = 'caught'; it.t = 0; it.sx = it.x; it.sy = it.y; }
+function catchItem(it){
+  beginCatch(it);
+  if (st.lock === it.id) st.lock = null;
+  st.combo++; st.bestCombo = Math.max(st.bestCombo, st.combo); st.caught++;
+  const mult = 1 + Math.floor(st.combo / 10) * .5;
+  it.pts = Math.round(it.text.length * (10 + (st.wave - 1) * 2) * mult);
+  st.score += it.pts;
+  sfx.catch(st.combo);
+  if (++st.waveCatches >= params().per) nextWave();
+}
+function nextWave(){
+  st.wave++; st.waveCatches = 0;
+  let sub = 'Faster fish';
+  if (!store.data.calm && st.lives < MAX_LIVES){ st.lives++; sub += ' · +1 life'; }
+  banner = {text:'Wave ' + st.wave, sub, t:0};
+  sfx.wave();
+}
+function wrong(ch, expected){
+  st.errors++; st.combo = 0; seal.shake = .35;
+  if (expected) st.trouble[expected] = (st.trouble[expected] || 0) + 1;
+  flashKey(ch, false); sfx.error();
+}
+function onMiss(it){
+  st.missed++; st.combo = 0;
+  const exp = st.lesson.chars ? it.text : it.text[it.typed];
+  st.trouble[exp] = (st.trouble[exp] || 0) + 1;
+  if (st.lock === it.id) st.lock = null;
+  sfx.splash();
+  if (!store.data.calm){
+    st.lives--; shakeT = .3;
+    if (st.lives <= 0) endRound('lives');
+  }
+}
+function handleChar(ch){
+  const falling = items.filter(i => i.state === 'fall');
+  if (!falling.length) return;
+  st.typedTotal++;
+  const L = st.lesson;
+  if (L.chars){
+    let best = null; for (const it of falling) if (it.text === ch && (!best || it.y > best.y)) best = it;
+    if (best){ st.typedCorrect++; flashKey(ch, true); catchItem(best); }
+    else wrong(ch, st.target && st.target.ch);
+    return;
+  }
+  let it = st.lock ? falling.find(i => i.id === st.lock) : null;
+  if (!it){
+    st.lock = null;
+    let best = null; for (const i of falling) if (i.text[0] === ch && (!best || i.y > best.y)) best = i;
+    if (!best) return wrong(ch, st.target && st.target.ch);
+    st.lock = best.id; best.typed = 1; st.typedCorrect++; flashKey(ch, true); sfx.key();
+    if (best.typed === best.text.length) catchItem(best);
+    return;
+  }
+  if (it.text[it.typed] === ch){
+    it.typed++; st.typedCorrect++; flashKey(ch, true);
+    if (it.typed === it.text.length) catchItem(it); else sfx.key();
+  } else wrong(ch, it.text[it.typed]);
+}
+function releaseLock(){
+  const it = st.lock && items.find(i => i.id === st.lock);
+  if (it) it.typed = 0;
+  st.lock = null;
+}
+function currentTarget(){
+  if (st.mode !== 'play') return null;
+  const lk = st.lock && items.find(i => i.id === st.lock && i.state === 'fall');
+  if (lk) return {id:lk.id, ch:lk.text[lk.typed]};
+  let low = null; for (const i of items) if (i.state === 'fall' && (!low || i.y > low.y)) low = i;
+  return low ? {id:low.id, ch:low.text[0]} : null;
+}
+
+/* ---------- Particles ---------- */
+function splash(x){
+  ripples.push({x, t:0});
+  const n = reduceMotion ? 5 : 14;
+  for (let i = 0; i < n; i++) parts.push({x, y:waterY, vx:(Math.random() - .5) * 240 * S, vy:-(70 + Math.random() * 170) * S, life:0, max:.5 + Math.random() * .35, r:(1.5 + Math.random() * 2.5) * S});
+}
+
+/* ---------- Update ---------- */
+function update(dt){
+  time += dt;
+  for (const f of snow){
+    f.y += f.vy * dt * (reduceMotion ? .4 : 1); f.x += Math.sin(time * .8 + f.ph) * 10 * dt;
+    if (f.y > H){ f.y = -4; f.x = Math.random() * W; }
+  }
+  if (st.mode === 'paused') return;
+  if (shakeT > 0) shakeT -= dt;
+  if (seal.chomp > 0) seal.chomp -= dt;
+  if (seal.shake > 0) seal.shake -= dt;
+
+  if (st.mode === 'play'){
+    st.activeTime += dt;
+    const P = params();
+    const falling = items.filter(i => i.state === 'fall');
+    if (!falling.length) st.spawnT = Math.min(st.spawnT, .3);
+    st.spawnT -= dt;
+    if (st.spawnT <= 0){
+      if (falling.length < P.max){ const txt = pickText(); spawn(txt, P.fall + (st.lesson.words ? txt.length * .35 : 0)); }
+      st.spawnT = P.every;
+    }
+  } else if (st.mode === 'menu'){
+    demoT -= dt;
+    if (demoT <= 0){ spawn('abcdefghijklmnopqrstuvwxyz'[Math.random() * 26 | 0], 7, true); demoT = 1.5; }
+  }
+
+  for (const it of items){
+    if (it.state === 'fall'){
+      it.y += it.vy * dt; it.phase += dt * 2;
+      it.x = it.baseX + (reduceMotion ? 0 : Math.sin(it.phase) * 6 * S);
+      if (it.demo && !it.decided && it.y > waterY - 150 * S){ it.decided = true; if (Math.random() < .8) beginCatch(it); }
+      if (it.state === 'fall' && it.y + 10 * S >= waterY){
+        it.state = 'gone'; splash(it.x);
+        if (!it.demo && st.mode === 'play') onMiss(it);
+      }
+    } else if (it.state === 'caught'){
+      it.t += dt / .42;
+      if (it.t >= 1){
+        it.state = 'gone'; seal.chomp = .22;
+        if (it.pts){ const m = mouth(); popups.push({x:m.x, y:m.y - 30 * S, text:'+' + it.pts, t:0}); }
+      }
+    }
+  }
+  items = items.filter(i => i.state !== 'gone');
+
+  st.target = currentTarget();
+  setTarget(st.target ? st.target.ch : null);
+
+  // Seal glides under the fish that matters most.
+  let desired = seal.x;
+  const flying = items.find(i => i.state === 'caught');
+  const tgt = st.target && items.find(i => i.id === st.target.id);
+  if (tgt) desired = tgt.x;
+  else if (flying) desired = flying.sx;
+  else { let low = null; for (const i of items) if (i.state === 'fall' && (!low || i.y > low.y)) low = i; if (low) desired = low.x; }
+  desired = Math.max(70 * S, Math.min(W - 70 * S, desired));
+  seal.x += (desired - seal.x) * Math.min(1, dt * 2.6);
+  if (desired > seal.x + 6) seal.face = 1; else if (desired < seal.x - 6) seal.face = -1;
+
+  for (const p of parts){ p.life += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 520 * S * dt; }
+  parts = parts.filter(p => p.life < p.max && p.y < H + 10);
+  for (const r of ripples) r.t += dt / .8;
+  ripples = ripples.filter(r => r.t < 1);
+  for (const p of popups) p.t += dt / .9;
+  popups = popups.filter(p => p.t < 1);
+  if (banner){ banner.t += dt; if (banner.t > 1.9) banner = null; }
+}
+
+/* ---------- Draw ---------- */
+function drawBackdrop(){
+  ctx.fillStyle = skyGrad; ctx.fillRect(-12, -12, W + 24, waterY + 24);
+  for (const s of stars){
+    ctx.globalAlpha = reduceMotion ? .55 : .3 + .45 * (.5 + .5 * Math.sin(time * s.sp + s.ph));
+    ctx.fillStyle = COL.ice; ctx.fillRect(s.x, s.y, s.r, s.r);
+  }
+  ctx.globalAlpha = 1;
+  // Aurora
+  const t = reduceMotion ? 0 : time;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const bands = [{c:COL.aurA, y:.17, a:.16, k:.006, s:.25}, {c:COL.aurB, y:.28, a:.10, k:.009, s:-.18}];
+  for (const b of bands){
+    const y0 = waterY * b.y + 10;
+    const g = ctx.createLinearGradient(0, y0 - 70, 0, y0 + 90);
+    g.addColorStop(0, hexA(b.c, 0)); g.addColorStop(.5, hexA(b.c, b.a)); g.addColorStop(1, hexA(b.c, 0));
+    ctx.fillStyle = g; ctx.beginPath();
+    const yy = x => y0 + Math.sin(x * b.k + t * b.s) * waterY * .06 + Math.sin(x * b.k * 2.3 - t * b.s * 1.4) * waterY * .025;
+    for (let x = -20; x <= W + 20; x += 20) x === -20 ? ctx.moveTo(x, yy(x) - 60) : ctx.lineTo(x, yy(x) - 60);
+    for (let x = W + 20; x >= -20; x -= 20) ctx.lineTo(x, yy(x) + 70);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+  // Distant icebergs on the horizon
+  ctx.fillStyle = hexA(COL.frost, .16);
+  for (const b of bergs){
+    ctx.beginPath(); ctx.moveTo(b.x, waterY + 2); ctx.lineTo(b.x + b.w * b.peak * .6, waterY - b.h * .7);
+    ctx.lineTo(b.x + b.w * b.peak, waterY - b.h); ctx.lineTo(b.x + b.w * .85, waterY - b.h * .35); ctx.lineTo(b.x + b.w, waterY + 2); ctx.closePath(); ctx.fill();
+  }
+  // Snow
+  ctx.fillStyle = hexA(COL.ice, .55);
+  for (const f of snow){ ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, TAU); ctx.fill(); }
+}
+function drawFishShape(){
+  ctx.fillStyle = COL.coralDark;
+  ctx.beginPath(); ctx.moveTo(-20, 0); ctx.lineTo(-37, -12); ctx.quadraticCurveTo(-31, 0, -37, 12); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-9, -10); ctx.quadraticCurveTo(0, -22, 12, -10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = COL.coral; ctx.beginPath(); ctx.ellipse(0, 0, 27, 13, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = COL.coralLight; ctx.beginPath(); ctx.ellipse(3, 5.5, 17, 5, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = COL.coralDark; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(4, 0, 10, -.9, .9); ctx.stroke();
+  ctx.fillStyle = COL.ice; ctx.beginPath(); ctx.arc(18.5, -3, 3.4, 0, TAU); ctx.fill();
+  ctx.fillStyle = COL.night; ctx.beginPath(); ctx.arc(19.5, -3, 1.8, 0, TAU); ctx.fill();
+}
+function drawLabel(it, s){
+  const isTarget = st.target && st.target.id === it.id;
+  const locked = st.lock === it.id;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (it.text.length === 1){
+    const f = fingerOf(it.text), sz = 30 * s;
+    if (isTarget){
+      ctx.save(); ctx.shadowColor = FCOL[f]; ctx.shadowBlur = 14 * s; ctx.strokeStyle = FCOL[f]; ctx.lineWidth = 3 * s;
+      rr(-sz / 2 - 4 * s, -sz / 2 - 4 * s, sz + 8 * s, sz + 8 * s, 9 * s); ctx.stroke(); ctx.restore();
+    }
+    ctx.fillStyle = FCOL[f]; rr(-sz / 2, -sz / 2, sz, sz + 2 * s, 7 * s); ctx.fill();
+    ctx.fillStyle = COL.ice; rr(-sz / 2, -sz / 2, sz, sz - 3 * s, 7 * s); ctx.fill();
+    ctx.fillStyle = COL.night; ctx.font = charFont(); ctx.fillText(it.text, 0, -1.5 * s);
+    return;
+  }
+  ctx.font = wordFont();
+  const tw = ctx.measureText(it.text).width, w = tw + 22 * s, h = 28 * s, cy = -30 * s;
+  if (isTarget || locked){
+    const c = locked ? COL.gold : FCOL[fingerOf(st.target.ch)];
+    ctx.save(); ctx.shadowColor = c; ctx.shadowBlur = 12 * s; ctx.strokeStyle = c; ctx.lineWidth = 3 * s;
+    rr(-w / 2 - 3 * s, cy - h / 2 - 3 * s, w + 6 * s, h + 6 * s, h / 2 + 3 * s); ctx.stroke(); ctx.restore();
+  }
+  ctx.fillStyle = COL.ice; rr(-w / 2, cy - h / 2, w, h, h / 2); ctx.fill();
+  ctx.textAlign = 'left';
+  const done = it.text.slice(0, it.typed), rest = it.text.slice(it.typed);
+  const x0 = -tw / 2;
+  ctx.fillStyle = COL.tealInk; ctx.fillText(done, x0, cy);
+  const dw = ctx.measureText(done).width;
+  if (locked && rest){ ctx.fillStyle = hexA(COL.gold, .55); ctx.fillRect(x0 + dw, cy + 8 * s, ctx.measureText(rest[0]).width, 2.5 * s); }
+  ctx.fillStyle = COL.night; ctx.fillText(rest, x0 + dw, cy);
+}
+function drawItem(it, x, y, scale, label){
+  const s = S * scale, rot = reduceMotion ? 0 : Math.sin(it.phase * 1.3) * .12;
+  ctx.save(); ctx.translate(x, y);
+  ctx.save(); ctx.rotate(rot); ctx.scale(it.dir * s, s); drawFishShape(); ctx.restore();
+  if (label) drawLabel(it, s);
+  ctx.restore();
+}
+function drawSea(){
+  const t = reduceMotion ? 0 : time;
+  const wy = x => waterY + Math.sin(x * .02 + t * 1.5) * 2.5 * S + Math.sin(x * .047 - t * 1.1) * 1.6 * S;
+  ctx.fillStyle = seaGrad; ctx.beginPath(); ctx.moveTo(-12, wy(-12));
+  for (let x = -12; x <= W + 12; x += 10) ctx.lineTo(x, wy(x));
+  ctx.lineTo(W + 12, H + 12); ctx.lineTo(-12, H + 12); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = hexA(COL.ice, .35); ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let x = -12; x <= W + 12; x += 10) x === -12 ? ctx.moveTo(x, wy(x)) : ctx.lineTo(x, wy(x));
+  ctx.stroke();
+  ctx.strokeStyle = hexA(COL.ice, .1); ctx.lineWidth = 1;
+  for (let i = 0; i < 9; i++){
+    const yy = waterY + 14 + i * (H - waterY) / 9, xx = ((i * 137 + t * 12 * (i % 2 ? 1 : -1)) % (W + 120) + W + 120) % (W + 120) - 60;
+    ctx.beginPath(); ctx.moveTo(xx, yy); ctx.lineTo(xx + 40 + (i % 3) * 18, yy); ctx.stroke();
+  }
+  for (const r of ripples){
+    ctx.strokeStyle = hexA(COL.ice, .5 * (1 - r.t)); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(r.x, waterY + 4 * S, (10 + 60 * r.t) * S, (3 + 12 * r.t) * S, 0, 0, TAU); ctx.stroke();
+  }
+}
+function drawSeal(){
+  const fy = floeY();
+  ctx.save(); ctx.translate(seal.x, fy); ctx.scale(S, S);
+  ctx.fillStyle = COL.frost; ctx.beginPath(); ctx.moveTo(-68, 0); ctx.lineTo(66, -1); ctx.lineTo(58, 12); ctx.lineTo(-60, 13); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = COL.ice; ctx.beginPath(); ctx.moveTo(-72, 1); ctx.lineTo(-54, -7); ctx.lineTo(44, -8); ctx.lineTo(70, 0); ctx.lineTo(60, 3); ctx.lineTo(-62, 4); ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  const wob = seal.shake > 0 && !reduceMotion ? Math.sin(time * 45) * 2.5 * S : 0;
+  const open = Math.max(seal.chomp > 0 ? seal.chomp / .22 : 0, items.some(i => i.state === 'caught' && i.t > .45) ? 1 : 0);
+  ctx.save(); ctx.translate(seal.x + wob, fy - 6 * S); ctx.scale(seal.face * S, S);
+  const el = (x, y, rx, ry, r, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, r, 0, TAU); ctx.fill(); };
+  const breathe = reduceMotion ? 0 : Math.sin(time * 2.2) * .6;
+  el(-40, -5, 11, 4.5, -.4, COL.sealDark); el(-41, -1, 11, 4, .35, COL.sealDark);
+  el(-6, -17, 36, 17 + breathe, 0, COL.seal);
+  el(0, -7, 26, 7, 0, COL.sealBelly);
+  el(-20, -24, 3.2, 3.2, 0, COL.sealDark); el(-10, -29, 2.2, 2.2, 0, COL.sealDark); el(-28, -15, 2.4, 2.4, 0, COL.sealDark);
+  el(16, -27, 15, 14, 0, COL.seal);
+  el(25, -38 + breathe * .5, 16, 16, 0, COL.seal);
+  el(36, -32, 9.5, 7, 0, COL.sealBelly);
+  el(43.5, -35, 3.6, 2.6, 0, COL.night);
+  if (open > .05) el(38, -26, 6, 1 + 4 * open, 0, COL.mouth);
+  else { ctx.strokeStyle = COL.night; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(34, -27.5); ctx.quadraticCurveTo(38, -24, 42, -27.5); ctx.stroke(); }
+  el(27, -42, 3.4, 3.4, 0, COL.night); el(28.3, -43.3, 1.1, 1.1, 0, COL.ice);
+  ctx.strokeStyle = hexA(COL.ice, .75); ctx.lineWidth = 1; ctx.beginPath();
+  ctx.moveTo(39, -31); ctx.lineTo(53, -35); ctx.moveTo(39, -30); ctx.lineTo(54, -29); ctx.moveTo(39, -29); ctx.lineTo(51, -24); ctx.stroke();
+  el(14, -5, 11, 4.5, .5, COL.sealDark);
+  ctx.restore();
+}
+function drawFront(){
+  const m = mouth();
+  for (const it of items){
+    if (it.state !== 'caught') continue;
+    const p = it.t < .5 ? 2 * it.t * it.t : 1 - Math.pow(-2 * it.t + 2, 2) / 2;
+    const x = it.sx + (m.x - it.sx) * p, y = it.sy + (m.y - it.sy) * p - Math.sin(p * Math.PI) * 70 * S;
+    drawItem(it, x, y, 1 - .55 * p, p < .45);
+  }
+  for (const pt of parts){
+    ctx.fillStyle = hexA(COL.ice, .85 * (1 - pt.life / pt.max));
+    ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.r, 0, TAU); ctx.fill();
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `${Math.round(20 * S)}px "Bagel Fat One", "Trebuchet MS", sans-serif`;
+  for (const p of popups){ ctx.fillStyle = hexA(COL.gold, 1 - p.t); ctx.fillText(p.text, p.x, p.y - p.t * 40 * S); }
+  if (banner){
+    const t = banner.t, a = t < .25 ? t / .25 : t > 1.45 ? Math.max(0, (1.9 - t) / .45) : 1;
+    ctx.globalAlpha = a;
+    ctx.font = `${Math.round(48 * S)}px "Bagel Fat One", "Trebuchet MS", sans-serif`;
+    ctx.fillStyle = COL.ice; ctx.fillText(banner.text, W / 2, waterY * .42);
+    ctx.font = `700 ${Math.round(16 * S)}px "Atkinson Hyperlegible", system-ui, sans-serif`;
+    ctx.fillStyle = COL.gold; ctx.fillText(banner.sub, W / 2, waterY * .42 + 40 * S);
+    ctx.globalAlpha = 1;
+  }
+}
+function draw(){
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.save();
+  if (shakeT > 0 && !reduceMotion){ const k = shakeT / .3; ctx.translate((Math.random() - .5) * 8 * k, (Math.random() - .5) * 6 * k); }
+  drawBackdrop();
+  for (const it of items) if (it.state === 'fall') drawItem(it, it.x, it.y, 1, true);
+  drawSea(); drawSeal(); drawFront();
+  ctx.restore();
+}
+
+/* ---------- DOM: keyboard hints, HUD, overlays ---------- */
+let curTarget, legendHTML = '';
+function renderHint(ch, k, shiftId){
+  const hint = $('#hint');
+  if (ch == null){ hint.innerHTML = legendHTML; return; }
+  const f = keyFinger[k.id];
+  const shown = ch === ' ' ? 'Space' : ch;
+  let html = `<span class="lbl">Next key</span><kbd style="--fc:var(--f-${f})">${esc(shown)}</kbd><span class="fing">${FINGERS[f]}</span>`;
+  if (shiftId) html += `<span class="plus">+</span><kbd style="--fc:var(--f-${keyFinger[shiftId]})">${shiftId === 'ShiftR' ? 'Right Shift' : 'Left Shift'}</kbd><span class="fing">${FINGERS[keyFinger[shiftId]]}</span>`;
+  hint.innerHTML = html;
+}
+function setTarget(ch){
+  if (ch === curTarget) return; curTarget = ch;
+  document.querySelectorAll('.key.target').forEach(e => e.classList.remove('target'));
+  const k = ch != null ? charToKey[ch] : null;
+  if (!k){ renderHint(null); return; }
+  keyEls[k.id].classList.add('target');
+  let shiftId = null;
+  if (k.shift){ shiftId = shiftFor(k.id); keyEls[shiftId].classList.add('target'); }
+  renderHint(ch, k, shiftId);
+}
+const flashTimers = new WeakMap();
+function flashEl(el, cls){
+  el.classList.remove('hit', 'bad'); void el.offsetWidth; el.classList.add(cls);
+  clearTimeout(flashTimers.get(el));
+  flashTimers.set(el, setTimeout(() => el.classList.remove(cls), 340));
+}
+function flashKey(ch, ok){
+  const k = charToKey[ch]; if (!k) return;
+  flashEl(keyEls[k.id], ok ? 'hit' : 'bad');
+  if (k.shift) flashEl(keyEls[shiftFor(k.id)], ok ? 'hit' : 'bad');
+}
+
+const hudCache = {};
+function setT(id, v, html){
+  if (hudCache[id] === v) return; hudCache[id] = v;
+  const el = document.getElementById(id); if (html) el.innerHTML = v; else el.textContent = v;
+}
+function updateHud(){
+  const P = st.lesson ? params() : null;
+  setT('sScore', fmt(st.score));
+  setT('sWave', P ? `${st.wave} · ${st.waveCatches}/${P.per}` : String(st.wave));
+  const mult = 1 + Math.floor(st.combo / 10) * .5;
+  setT('sCombo', st.combo + (mult > 1 ? ` ×${mult}` : ''));
+  setT('sAcc', st.typedTotal ? Math.round(100 * st.typedCorrect / st.typedTotal) + '%' : '–');
+  setT('sWpm', st.activeTime > 3 && st.typedCorrect ? String(Math.round(st.typedCorrect / 5 / (st.activeTime / 60))) : '–');
+  const lv = store.data.calm ? 'Calm' : Array.from({length:MAX_LIVES}, (_, i) => `<i class="pip${i < st.lives ? '' : ' lost'}"></i>`).join('');
+  setT('sLives', lv, true);
+}
+function showOverlay(name){
+  $('#menu').hidden = name !== 'menu';
+  $('#pauseO').hidden = name !== 'pause';
+  $('#overO').hidden = name !== 'over';
+}
+function updatePauseBtn(){
+  const b = $('#btnPause');
+  b.disabled = !(st.mode === 'play' || st.mode === 'paused');
+  b.textContent = st.mode === 'paused' ? 'Resume' : 'Pause';
+}
+function updateSoundBtn(){
+  const b = $('#btnSound');
+  b.textContent = store.data.muted ? 'Sound off' : 'Sound on';
+  b.setAttribute('aria-pressed', String(!store.data.muted));
+}
+function renderLessons(){
+  for (const [group, elId] of [['Keys', 'lessonsKeys'], ['Words', 'lessonsWords']]){
+    const wrap = document.getElementById(elId); wrap.textContent = '';
+    for (const L of LESSONS.filter(l => l.group === group)){
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'lesson' + (L.id === store.data.last ? ' last' : ''); b.dataset.id = L.id;
+      const best = store.data.best[L.id];
+      b.innerHTML = `<span class="nm">${esc(L.name)}</span><span class="ks">${esc(L.preview)}</span><span class="bs">${best ? 'Best ' + fmt(best) : 'Not played yet'}</span>`;
+      b.addEventListener('click', () => startLesson(L.id));
+      wrap.appendChild(b);
+    }
+  }
+}
+function fillOver(newBest){
+  const L = st.lesson, calm = store.data.calm;
+  $('#ovLesson').textContent = L.name + (calm ? ' · Calm water' : '');
+  $('#ovTitle').textContent = st.endedBy === 'lives' ? 'Out of lives' : 'Round over';
+  $('#ovScore').textContent = fmt(st.score);
+  const pill = $('#ovBest');
+  pill.className = 'pill' + (newBest ? ' new' : '');
+  pill.textContent = newBest ? 'New best' : calm ? 'Calm rounds don’t set a best' : 'Best ' + fmt(store.data.best[L.id] || 0);
+  const acc = st.typedTotal ? Math.round(100 * st.typedCorrect / st.typedTotal) + '%' : '–';
+  const wpm = st.activeTime > 3 && st.typedCorrect ? Math.round(st.typedCorrect / 5 / (st.activeTime / 60)) : '–';
+  const rows = [['Fish caught', st.caught], ['Fish missed', st.missed], ['Accuracy', acc], ['Speed', wpm + (wpm === '–' ? '' : ' WPM')], ['Best combo', st.bestCombo], ['Wave', st.wave]];
+  $('#ovStats').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
+  const top = Object.entries(st.trouble).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  $('#ovTrouble').innerHTML = top.length
+    ? top.map(([ch, n]) => { const f = fingerOf(ch); return `<span class="tk"><kbd style="--fc:var(--f-${f})">${esc(ch === ' ' ? 'Space' : ch)}</kbd>×${n} <span>${FINGERS[f]}</span></span>`; }).join('')
+    : 'No trouble keys this round. Try the next lesson.';
+}
+
+/* ---------- Flow ---------- */
+function resetRound(){
+  Object.assign(st, {score:0, lives:MAX_LIVES, combo:0, bestCombo:0, wave:1, waveCatches:0, caught:0, missed:0,
+    typedCorrect:0, typedTotal:0, errors:0, activeTime:0, lock:null, spawnT:.6, trouble:{}, lastText:'', endedBy:'', target:null});
+}
+function startLesson(id){
+  audio();
+  const L = LESSONS.find(l => l.id === id) || LESSONS[0];
+  st.lesson = L; store.data.last = L.id; store.save();
+  clearTimeout(overTimer);
+  resetRound(); st.mode = 'play';
+  items = []; popups = []; parts = []; ripples = [];
+  banner = {text:'Wave 1', sub:L.name, t:0};
+  showOverlay(null); updatePauseBtn(); curTarget = undefined;
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  if (coarse) $('#mobileInput').focus({preventScroll:true});
+}
+function showMenu(focus){
+  clearTimeout(overTimer);
+  st.mode = 'menu'; st.lock = null; items = []; popups = []; banner = null; demoT = .3;
+  renderLessons(); showOverlay('menu'); setTarget(null); updatePauseBtn();
+  if (focus){ const b = document.querySelector('.lesson.last'); if (b) b.focus({preventScroll:true}); }
+}
+function pause(){ if (st.mode !== 'play') return; st.mode = 'paused'; showOverlay('pause'); updatePauseBtn(); $('#btnResume').focus({preventScroll:true}); }
+function resume(){
+  if (st.mode !== 'paused') return; st.mode = 'play'; showOverlay(null); updatePauseBtn();
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  if (coarse) $('#mobileInput').focus({preventScroll:true});
+}
+function endRound(reason){
+  st.mode = 'over'; st.endedBy = reason; st.lock = null; setTarget(null); updatePauseBtn();
+  let newBest = false;
+  if (!store.data.calm && st.score > (store.data.best[st.lesson.id] || 0) && st.score > 0){
+    store.data.best[st.lesson.id] = st.score; store.save(); newBest = true;
+  }
+  clearTimeout(overTimer);
+  overTimer = setTimeout(() => {
+    if (st.mode !== 'over') return;
+    fillOver(newBest); showOverlay('over'); $('#btnAgain').focus({preventScroll:true});
+  }, reason === 'lives' ? 900 : 0);
+}
+
+/* ---------- Input ---------- */
+document.addEventListener('keydown', e => {
+  const onButton = e.target && e.target.tagName === 'BUTTON';
+  if (e.key === 'Escape'){
+    if (st.mode === 'play'){ pause(); e.preventDefault(); }
+    else if (st.mode === 'paused'){ resume(); e.preventDefault(); }
+    return;
+  }
+  if (st.mode === 'menu'){ if (e.key === 'Enter' && !onButton){ e.preventDefault(); startLesson(store.data.last); } return; }
+  if (st.mode === 'over'){ if (e.key === 'Enter' && !onButton && !$('#overO').hidden){ e.preventDefault(); startLesson(st.lesson.id); } return; }
+  if (st.mode === 'paused'){ if (e.key === 'Enter' && !onButton){ e.preventDefault(); resume(); } return; }
+  // playing
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'Backspace'){ e.preventDefault(); releaseLock(); return; }
+  if (e.key === 'Tab'){ e.preventDefault(); return; }
+  if (e.key.length !== 1) return;
+  e.preventDefault();
+  if (e.repeat || e.key === ' ') return;
+  handleChar(e.key);
+});
+$('#mobileInput').addEventListener('input', e => {
+  const v = e.target.value; e.target.value = '';
+  if (st.mode !== 'play') return;
+  for (const ch of v) if (ch !== ' ') handleChar(ch);
+});
+stage.addEventListener('pointerdown', () => { if (st.mode === 'play' && coarse) $('#mobileInput').focus({preventScroll:true}); });
+$('#btnPause').addEventListener('click', () => st.mode === 'paused' ? resume() : pause());
+$('#btnSound').addEventListener('click', () => { store.data.muted = !store.data.muted; store.save(); updateSoundBtn(); if (!store.data.muted) audio(); });
+$('#btnResume').addEventListener('click', resume);
+$('#btnEnd').addEventListener('click', () => endRound('quit'));
+$('#btnMenu1').addEventListener('click', () => showMenu(true));
+$('#btnMenu2').addEventListener('click', () => showMenu(true));
+$('#btnAgain').addEventListener('click', () => startLesson(st.lesson.id));
+$('#optCalm').addEventListener('change', e => { store.data.calm = e.target.checked; store.save(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+window.addEventListener('blur', pause);
+
+/* ---------- Boot ---------- */
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(.05, Math.max(0, (now - last) / 1000)); last = now;
+  update(dt); draw(); updateHud();
+  requestAnimationFrame(frame);
+}
+function snapshot(){
+  const game = (st.mode === 'play' || st.mode === 'paused') && st.lesson ? {
+    lessonId:st.lesson.id, score:st.score, lives:st.lives, combo:st.combo, bestCombo:st.bestCombo, wave:st.wave, waveCatches:st.waveCatches,
+    caught:st.caught, missed:st.missed, typedCorrect:st.typedCorrect, typedTotal:st.typedTotal, errors:st.errors, activeTime:st.activeTime, trouble:st.trouble
+  } : null;
+  return {game};
+}
+function boot(data){
+  store.load();
+  legendHTML = '<span class="lbl">Key colors show the finger</span>' +
+    Object.keys(SHORT).map(f => `<span class="chip"><i class="dot" style="--fc:var(--f-${f})"></i>${SHORT[f]}</span>`).join('');
+  buildKeyboard();
+  $('#optCalm').checked = !!store.data.calm;
+  updateSoundBtn();
+  resize();
+  new ResizeObserver(resize).observe(stage);
+  if (document.fonts && document.fonts.load){
+    ['40px "Bagel Fat One"', '600 18px "IBM Plex Mono"', '700 16px "Atkinson Hyperlegible"'].forEach(f => document.fonts.load(f).catch(()=>{}));
+  }
+  const g = data && data.game;
+  const L = g && LESSONS.find(l => l.id === g.lessonId);
+  if (L){
+    st.lesson = L; resetRound();
+    for (const k of ['score','lives','combo','bestCombo','wave','waveCatches','caught','missed','typedCorrect','typedTotal','errors','activeTime','trouble']) if (k in g) st[k] = g[k];
+    st.mode = 'paused'; renderLessons(); showOverlay('pause'); updatePauseBtn(); setTarget(null);
+  } else showMenu(false);
+  requestAnimationFrame(t => { last = t; frame(t); });
+}
+window.claude?.hot?.snapshot?.(snapshot);
+window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
